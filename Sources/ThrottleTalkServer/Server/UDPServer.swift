@@ -21,7 +21,7 @@ public final class UDPServer {
     public init(config: ServerConfig, logger: Logger) {
         self.config = config
         // Single-threaded is fine for a UDP SFU -- all work is non-blocking I/O.
-        self.group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         self.channelManager = ChannelManager(config: config, logger: logger)
         self.logger = logger
     }

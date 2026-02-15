@@ -54,6 +54,8 @@ public final class PacketHandler: ChannelInboundHandler {
             return
         }
 
+        logger.debug("Decoded \(packet.type) from \(packet.participantID) channel=\(packet.channelID) flags=\(packet.flags.rawValue) payload=\(packet.payload.count)B")
+
         switch packet.type {
         case .audio:
             handleAudio(packet: packet, senderAddress: senderAddress, context: context)
@@ -64,6 +66,8 @@ public final class PacketHandler: ChannelInboundHandler {
         case .control:
             handleControl(packet: packet, senderAddress: senderAddress, context: context)
         }
+
+        logger.debug("Finished processing \(packet.type) from \(packet.participantID)")
     }
 
     public func errorCaught(context: ChannelHandlerContext, error: Error) {
@@ -100,21 +104,27 @@ public final class PacketHandler: ChannelInboundHandler {
     /// Update the participant's heartbeat and broadcast to other participants
     /// so they learn display names and presence.
     private func handleHeartbeat(packet: Packet, senderAddress: SocketAddress, context: ChannelHandlerContext) {
+        logger.debug("handleHeartbeat: joining \(packet.participantID) to channel \(packet.channelID)")
+
         channelManager.handleJoin(
             channelID: packet.channelID,
             participantID: packet.participantID,
             address: senderAddress
         )
 
+        logger.debug("handleHeartbeat: join complete, updating participant")
+
         if let channel = channelManager.channel(for: packet.channelID) {
             channel.updateParticipant(id: packet.participantID, address: senderAddress, flags: packet.flags)
         }
+
+        logger.debug("handleHeartbeat: forwarding to other participants")
 
         // Broadcast heartbeat to all other participants so they can display
         // rider names and admin status.
         channelManager.forward(packet: packet, from: packet.participantID, context: context)
 
-        logger.trace("Heartbeat from \(packet.participantID) on channel \(packet.channelID)")
+        logger.debug("handleHeartbeat: complete for \(packet.participantID)")
     }
 
     /// Handle control packets — admin commands like mute/kick, and leave notifications.

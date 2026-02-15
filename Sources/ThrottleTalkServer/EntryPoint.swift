@@ -30,10 +30,16 @@ struct ThrottleTalkServerCommand: ParsableCommand {
     var heartbeatInterval: Double = Double(ProcessInfo.processInfo.environment["THROTTLETALK_HEARTBEAT_INTERVAL"] ?? "") ?? 3
 
     func run() throws {
+        // Force line-buffered stdout so Docker logs aren't lost on crash.
+        // Without this, stdout is fully buffered in Docker pipes and log
+        // lines disappear when the process exits unexpectedly.
+        setvbuf(stdout, nil, _IOLBF, 0)
+        setvbuf(stderr, nil, _IONBF, 0)
+
         // Bootstrap swift-log.
         LoggingSystem.bootstrap { label in
-            var handler = StreamLogHandler.standardOutput(label: label)
-            handler.logLevel = .info
+            var handler = StreamLogHandler.standardError(label: label)
+            handler.logLevel = .debug
             return handler
         }
         let logger = Logger(label: "com.throttletalk.server")
