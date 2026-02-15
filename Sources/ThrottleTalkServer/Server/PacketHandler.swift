@@ -19,6 +19,13 @@ public final class PacketHandler: ChannelInboundHandler {
     private let channelManager: ChannelManager
     private let logger: Logger
 
+    /// Total packets received (for periodic logging).
+    private var totalPacketsReceived: Int = 0
+    /// Total packets that failed to decode.
+    private var totalMalformed: Int = 0
+    /// Total packets forwarded.
+    private var totalForwarded: Int = 0
+
     public init(channelManager: ChannelManager, logger: Logger) {
         self.channelManager = channelManager
         self.logger = logger
@@ -31,8 +38,19 @@ public final class PacketHandler: ChannelInboundHandler {
         var buffer = envelope.data
         let senderAddress = envelope.remoteAddress
 
+        totalPacketsReceived += 1
+
+        // Log first packet and every 100th to confirm packets are arriving.
+        if totalPacketsReceived == 1 {
+            logger.info("First UDP packet received from \(senderAddress) (\(buffer.readableBytes) bytes)")
+        } else if totalPacketsReceived % 100 == 0 {
+            logger.info("Packets: \(totalPacketsReceived) received, \(totalMalformed) malformed, \(totalForwarded) forwarded")
+        }
+
         guard let packet = PacketCodec.decode(buffer: &buffer) else {
-            logger.debug("Dropped malformed packet from \(senderAddress)")
+            totalMalformed += 1
+            // Log at warning level so we can always see decode failures.
+            logger.warning("Dropped malformed packet from \(senderAddress) (\(envelope.data.readableBytes) bytes, malformed #\(totalMalformed))")
             return
         }
 

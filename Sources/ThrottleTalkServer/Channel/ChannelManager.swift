@@ -91,14 +91,23 @@ public final class ChannelManager {
     ///
     /// This is the hot path of the SFU. The packet is re-encoded once and then
     /// written to each recipient's address via the NIO channel context.
+    /// Total packets forwarded (for diagnostics).
+    private var totalForwarded: Int = 0
+
     public func forward(packet: Packet, from senderID: UUID, context: ChannelHandlerContext) {
         guard let channel = channels[packet.channelID] else {
-            logger.debug("Forward: no channel \(packet.channelID) for sender \(senderID)")
+            logger.warning("Forward: no channel \(packet.channelID) for sender \(senderID)")
             return
         }
 
         let recipients = channel.allParticipants(except: senderID)
-        guard !recipients.isEmpty else { return }
+        guard !recipients.isEmpty else {
+            // Log occasionally when there are no recipients — helps diagnose single-participant issues.
+            if packet.type == .heartbeat {
+                logger.info("Forward: no other participants in channel \(packet.channelID) for \(senderID) (\(channel.participantCount) total)")
+            }
+            return
+        }
 
         // Encode the packet once.
         var outBuffer = context.channel.allocator.buffer(capacity: kPacketHeaderSize + packet.payload.count + kPacketCRCSize)
@@ -109,6 +118,14 @@ public final class ChannelManager {
             context.write(NIOAny(envelope), promise: nil)
         }
         context.flush()
+
+        totalForwarded += recipients.count
+        // Log first forward and every 100th.
+        if totalForwarded <= recipients.count {
+            logger.info("First forward: \(packet.type) from \(senderID) → \(recipients.count) recipient(s) at \(recipients.map { "\($0.remoteAddress)" })")
+        } else if totalForwarded % 100 < recipients.count {
+            logger.info("Forwarded \(totalForwarded) packets total (\(channel.participantCount) participants in channel)")
+        }
     }
 
     // MARK: - Cleanup
