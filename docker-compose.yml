@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  relay:
+    build: .
+    container_name: throttletalk-relay
+    ports:
+      - "${THROTTLETALK_PORT:-9000}:${THROTTLETALK_PORT:-9000}/udp"
+    environment:
+      - THROTTLETALK_HOST=0.0.0.0
+      - THROTTLETALK_PORT=${THROTTLETALK_PORT:-9000}
+      - THROTTLETALK_MAX_CHANNELS=${THROTTLETALK_MAX_CHANNELS:-100}
+      - THROTTLETALK_MAX_PARTICIPANTS=${THROTTLETALK_MAX_PARTICIPANTS:-40}
+      - THROTTLETALK_HEARTBEAT_TIMEOUT=${THROTTLETALK_HEARTBEAT_TIMEOUT:-10}
+      - THROTTLETALK_HEARTBEAT_INTERVAL=${THROTTLETALK_HEARTBEAT_INTERVAL:-3}
+    stop_signal: SIGTERM
+    stop_grace_period: 5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
