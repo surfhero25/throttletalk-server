@@ -4,8 +4,9 @@ services:
   relay:
     build: .
     container_name: throttletalk-relay
-    ports:
-      - "${THROTTLETALK_PORT:-9000}:${THROTTLETALK_PORT:-9000}/udp"
+    # Use host networking — Docker bridge NAT breaks UDP forwarding for SFU
+    # servers because conntrack can't properly track multi-party packet flows.
+    network_mode: host
     environment:
       - THROTTLETALK_HOST=0.0.0.0
       - THROTTLETALK_PORT=${THROTTLETALK_PORT:-9000}
