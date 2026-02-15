@@ -110,6 +110,10 @@ public enum PacketCodec {
         }
 
         // --- CRC32 (4 bytes) ---
+        // IMPORTANT: We must read the CRC bytes BEFORE calling getBytes below,
+        // but getBytes(at:) requires index >= readerIndex. Since all the read*
+        // calls above advanced the readerIndex past startReaderIndex, we need
+        // to temporarily move it back to access the header+payload for CRC.
         guard let receivedCRC = buffer.readInteger(as: UInt32.self) else {
             buffer.moveReaderIndex(to: startReaderIndex)
             return nil
@@ -117,7 +121,13 @@ public enum PacketCodec {
 
         // Validate CRC over header + payload (everything before the CRC field).
         let crcDataLength = kPacketHeaderSize + Int(payloadLength)
-        let crcData = buffer.getBytes(at: startReaderIndex, length: crcDataLength)!
+        let afterCRCIndex = buffer.readerIndex
+        buffer.moveReaderIndex(to: startReaderIndex)
+        guard let crcData = buffer.getBytes(at: startReaderIndex, length: crcDataLength) else {
+            buffer.moveReaderIndex(to: startReaderIndex)
+            return nil
+        }
+        buffer.moveReaderIndex(to: afterCRCIndex)
         let computedCRC = CRC32.compute(Data(crcData))
 
         guard computedCRC == receivedCRC else {
